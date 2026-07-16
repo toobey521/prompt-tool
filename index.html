@@ -204,7 +204,6 @@ h1 .gradient-text::after {
         <label>选择 API 提供商</label>
         <select id="providerSelect" onchange="onProviderChange()">
           <option value="">— 手动填写 —</option>
-          <option value="deepseek">DeepSeek (deepseek-chat) — 国内，纯文本</option>
           <option value="siliconflow">SiliconFlow (Qwen2.5-VL-7B) — 国产，便宜</option>
           <option value="zhipu">智谱 GLM-4V-Plus — 国产，视觉模型</option>
           <option value="aliyun">阿里百炼 (qwen-vl-plus) — 通义千问视觉版</option>
@@ -312,7 +311,6 @@ h1 .gradient-text::after {
 const PROVIDERS = {
   ollama:        { url: 'http://127.0.0.1:11434/v1/chat/completions',          model: 'qwen2.5vl:7b',              vision: true },
   openai:        { url: 'https://api.openai.com/v1/chat/completions',            model: 'gpt-4o',                     vision: true },
-  deepseek:      { url: 'https://api.deepseek.com/v1/chat/completions',          model: 'deepseek-chat',              vision: false },
   siliconflow:   { url: 'https://api.siliconflow.cn/v1/chat/completions',       model: 'Qwen/Qwen2.5-VL-7B-Instruct', vision: true },
   zhipu:         { url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions', model: 'glm-4v-plus',                vision: true },
   aliyun:        { url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', model: 'qwen-vl-plus', vision: true },
