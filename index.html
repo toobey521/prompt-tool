@@ -138,8 +138,13 @@ h1 .gradient-text::after {
 .result-header {
   display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
 }
-.result-header h2 { font-size: 18px; background: linear-gradient(135deg, #2563eb, #0ea5e9);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.result-header h2 { font-size: 18px; }
+.result-header h2 .emoji { display: inline; }
+.result-header h2 .gradient-text {
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 .result-actions { display: flex; gap: 6px; }
 .result-content {
   background: rgba(255, 255, 255, 0.65);
@@ -290,7 +295,7 @@ h1 .gradient-text::after {
   <!-- 📝 结果 -->
   <div class="result-wrap" id="resultWrap">
     <div class="result-header">
-      <h2>✨ 生成的专业提示词</h2>
+      <h2><span class="emoji">✨</span><span class="gradient-text">生成的专业提示词</span></h2>
       <div class="result-actions">
         <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;" onclick="copyResult()">📋 复制</button>
         <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;" onclick="downloadResult()">⬇️ 下载</button>
