@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>提示词反推工具-Toobey</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: linear-gradient(135deg, #e8f4fd 0%, #d0ebf9 30%, #b8e0f5 60%, #e0f0fe 100%);
+  min-height: 100vh; position: relative; overflow-x: hidden;
+}
+/* 科技感背景装饰 */
+body::before {
+  content: ''; position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.04) 0%, transparent 40%);
+  pointer-events: none; z-index: 0;
+}
+/* 科技网格 */
+body::after {
+  content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background-image:
+    linear-gradient(rgba(59, 130, 246, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none; z-index: 0;
+}
+.container { max-width: 960px; margin: 0 auto; padding: 24px 16px; position: relative; z-index: 1; }
+h1 {
+  text-align: center; font-size: 28px; font-weight: 800; margin-bottom: 4px;
+  letter-spacing: 1px;
+}
+h1 .emoji-icon {
+  font-size: 30px; display: inline-block; vertical-align: middle;
+  margin-right: 4px; font-weight: 400;
+}
+h1 .gradient-text {
+  background: linear-gradient(135deg, #2563eb, #0ea5e9, #6366f1);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+h1 .gradient-text::after {
+  content: '—Toobey'; font-size: 14px; font-weight: 400;
+  background: linear-gradient(135deg, #6366f1, #0ea5e9);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-left: 8px; letter-spacing: 2px;
+}
+.subtitle { text-align: center; color: #64748b; font-size: 13px; margin-bottom: 20px; }
+
+/* API 配置面板 - 毛玻璃效果 */
+.config-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 14px; padding: 16px; margin-bottom: 16px;
+  box-shadow: 0 4px 24px rgba(59, 130, 246, 0.06);
+}
+.config-panel summary {
+  cursor: pointer; font-size: 14px; font-weight: 600; color: #2563eb;
+  user-select: none;
+}
+.config-panel summary:hover { color: #1d4ed8; }
+.config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.config-grid .full { grid-column: 1 / -1; }
+.config-grid label { display: block; font-size: 12px; color: #475569; margin-bottom: 3px; font-weight: 500; }
+.config-grid input, .config-grid select {
+  width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2);
+  background: rgba(255, 255, 255, 0.8); color: #1e293b; font-size: 13px;
+  transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+.config-grid input:focus, .config-grid select:focus {
+  outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+}
+
+/* Upload Zone */
+.upload-zone {
+  border: 2px dashed rgba(59, 130, 246, 0.25);
+  border-radius: 14px; padding: 40px 16px;
+  text-align: center; cursor: pointer; transition: all 0.3s;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 2px 16px rgba(59,130,246,0.04);
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: #3b82f6; background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 4px 24px rgba(59,130,246,0.1);
+}
+.upload-zone.has-file { border-color: #059669; background: rgba(5, 150, 105, 0.06); padding: 16px; }
+.upload-zone .icon { font-size: 42px; margin-bottom: 8px; }
+.upload-zone .text { font-size: 15px; color: #475569; }
+.upload-zone .hint { font-size: 12px; color: #94a3b8; margin-top: 6px; }
+.upload-zone .preview-wrap { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.upload-zone .preview-wrap img, .upload-zone .preview-wrap video {
+  max-height: 180px; max-width: 100%; border-radius: 10px; object-fit: contain;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.upload-zone .file-info { margin-top: 8px; font-size: 12px; color: #2563eb; font-weight: 500; }
+.upload-zone input[type="file"] { display: none; }
+
+/* Buttons - 科技感按钮 */
+.btn-row { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+.btn {
+  padding: 10px 28px; border: none; border-radius: 10px;
+  font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.25s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-primary {
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  color: #fff; box-shadow: 0 4px 16px rgba(37,99,235,0.25);
+}
+.btn-primary:hover {
+  transform: translateY(-2px); box-shadow: 0 6px 24px rgba(37,99,235,0.35);
+}
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.6); color: #475569;
+  border: 1px solid rgba(59, 130, 246, 0.15);
+}
+.btn-secondary:hover { background: rgba(255, 255, 255, 0.8); border-color: rgba(59, 130, 246, 0.3); }
+
+/* Progress */
+.progress-wrap { display: none; margin-top: 16px; }
+.progress-bar { height: 5px; background: rgba(59,130,246,0.1); border-radius: 3px; overflow: hidden; }
+.progress-bar .fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #2563eb, #0ea5e9, #6366f1);
+  border-radius: 3px; transition: width 0.3s;
+}
+.progress-text { font-size: 12px; color: #64748b; margin-top: 6px; text-align: center; }
+
+/* Result */
+.result-wrap { display: none; margin-top: 24px; }
+.result-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+}
+.result-header h2 { font-size: 18px; background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.result-actions { display: flex; gap: 6px; }
+.result-content {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: 12px; padding: 16px; max-height: 550px; overflow-y: auto;
+  white-space: pre-wrap; font-size: 13px; line-height: 1.65;
+  font-family: "JetBrains Mono", "Consolas", monospace;
+  color: #334155;
+}
+.result-content .section { margin-bottom: 14px; }
+.result-content .section-title {
+  font-weight: 700; background: linear-gradient(135deg, #2563eb, #6366f1);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  font-size: 14px; margin-bottom: 5px;
+}
+.result-content .section-body { color: #475569; padding-left: 4px; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+  padding: 10px 24px; border-radius: 10px; font-size: 14px;
+  opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999;
+  backdrop-filter: blur(8px);
+}
+.toast.show { opacity: 1; }
+.toast.success { background: rgba(5, 150, 105, 0.9); color: #fff; }
+.toast.error { background: rgba(239, 68, 68, 0.9); color: #fff; }
+
+/* Spinner */
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Status */
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.status-dot.ok { background: #059669; }
+.status-dot.err { background: #ef4444; }
+.status-text { font-size: 12px; margin-top: 4px; color: #64748b; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .config-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1><span class="emoji-icon">🎨</span><span class="gradient-text">提示词反推工具</span></h1>
+  <div class="subtitle">
+    <span>上传图片或视频 → AI 自动生成专业绘图提示词 · 纯网页版，零安装</span>
+  </div>
+
+  <!-- ⚙️ API 配置 -->
+  <details class="config-panel" id="configPanel">
+    <summary>⚙️ API 配置</summary>
+    <div class="config-grid">
+      <div class="full">
+        <label>选择 API 提供商</label>
+        <select id="providerSelect" onchange="onProviderChange()">
+          <option value="">— 手动填写 —</option>
+          <option value="deepseek">DeepSeek (deepseek-chat) — 国内，纯文本</option>
+          <option value="siliconflow">SiliconFlow (Qwen2.5-VL-7B) — 国产，便宜</option>
+          <option value="zhipu">智谱 GLM-4V-Plus — 国产，视觉模型</option>
+          <option value="aliyun">阿里百炼 (qwen-vl-plus) — 通义千问视觉版</option>
+          <option value="baidu">百度千帆 (ernie-4.5-vision) — 文心一言视觉版</option>
+          <option value="kimi">月之暗面 Kimi (moonshot-v1-vision) — 国产</option>
+          <option value="lingyi">零一万物 Yi-Vision — 国产</option>
+          <option value="openai">OpenAI (gpt-4o / gpt-4o-mini) — 海外，效果最好</option>
+          <option value="groq">Groq (Llama-3.2-90B-Vision) — 海外，免费额度</option>
+          <option value="together">Together AI (Llama-3.2-90B-Vision) — 海外</option>
+          <option value="openrouter">OpenRouter — 聚合网关，一个 Key 调所有</option>
+          <option value="xai">xAI Grok (grok-vision) — 海外</option>
+          <option value="ollama">🖥️ 本地 Ollama (qwen2.5vl:7b) — 无需API Key，已有模型</option>
+        </select>
+      </div>
+      <div class="full">
+        <label>API 地址</label>
+        <input type="url" id="apiUrl" placeholder="https://api.openai.com/v1/chat/completions" value="">
+      </div>
+      <div>
+        <label>API Key</label>
+        <input type="password" id="apiKey" placeholder="留空则无认证（如本地 Ollama）" autocomplete="off">
+      </div>
+      <div>
+        <label>模型名称</label>
+        <input type="text" id="modelName" placeholder="例: gpt-4o / deepseek-chat / ..." value="">
+      </div>
+      <div>
+        <label>分析精度</label>
+        <select id="detailLevel">
+          <option value="high">高清 (high) — 细节最丰富</option>
+          <option value="auto" selected>自动 (auto) — 平衡</option>
+          <option value="low">低清 (low) — 速度快</option>
+        </select>
+      </div>
+      <div>
+        <label>输出语言</label>
+        <select id="outputLang">
+          <option value="cn" selected>中文（带英文提示词）</option>
+          <option value="en">English only</option>
+          <option value="both">中英双语完整</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+      <span class="status-dot" id="apiStatusDot"></span>
+      <span class="status-text" id="apiStatusText">未测试</span>
+      <button class="btn btn-secondary" style="padding:4px 14px;font-size:12px;" onclick="testApiConnection()">测试连接</button>
+      <button class="btn btn-secondary" style="padding:4px 14px;font-size:12px;" onclick="saveAllConfig()">💾 保存配置</button>
+      <span class="status-text" id="saveStatus" style="font-size:11px;color:#666;"></span>
+    </div>
+  </details>
+
+  <!-- 📤 上传区 -->
+  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+    <div id="uploadPlaceholder">
+      <div class="icon">📤</div>
+      <div class="text">点击或拖拽图片到此处</div>
+      <div class="hint" id="formatHint">图片: JPG / PNG / WebP / GIF / BMP / TIFF / AVIF / HEIC · 视频: MP4 / WebM / AVI / MOV / MKV / FLV</div>
+    </div>
+    <div id="uploadPreview" style="display:none">
+      <div class="preview-wrap" id="previewWrap"></div>
+      <div class="file-info" id="fileInfo"></div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*,video/*,.heic,.heif,.avif,.tiff,.tif" onchange="handleFile(event)">
+  </div>
+
+  <!-- 视频抽帧选项 -->
+  <div class="frame-options" id="frameOptions" style="display:none;margin-top:10px;text-align:center;">
+    <label style="font-size:13px;color:#475569;margin-right:6px;">视频抽帧数量:</label>
+    <input type="number" id="frameCount" value="5" min="3" max="12" style="width:60px;padding:6px 10px;border-radius:8px;border:1px solid rgba(59,130,246,0.2);background:rgba(255,255,255,0.8);color:#1e293b;font-size:13px;text-align:center;">
+    <span style="font-size:12px;color:#94a3b8;margin-left:6px;">抽得越多分析越准，但耗时更长</span>
+  </div>
+
+  <!-- 🔘 操作按钮 -->
+  <div class="btn-row">
+    <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()" disabled>
+      🔍 开始分析
+    </button>
+    <button class="btn btn-secondary" onclick="resetAll()">🔄 重置</button>
+  </div>
+
+  <!-- 📊 进度条 -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar"><div class="fill" id="progressFill"></div></div>
+    <div class="progress-text" id="progressText">准备中...</div>
+  </div>
+
+  <!-- 📝 结果 -->
+  <div class="result-wrap" id="resultWrap">
+    <div class="result-header">
+      <h2>✨ 生成的专业提示词</h2>
+      <div class="result-actions">
+        <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;" onclick="copyResult()">📋 复制</button>
+        <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;" onclick="downloadResult()">⬇️ 下载</button>
+      </div>
+    </div>
+    <div class="result-content" id="resultContent"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ 预设模板 ============
+const PROVIDERS = {
+  ollama:        { url: 'http://127.0.0.1:11434/v1/chat/completions',          model: 'qwen2.5vl:7b',              vision: true },
+  openai:        { url: 'https://api.openai.com/v1/chat/completions',            model: 'gpt-4o',                     vision: true },
+  deepseek:      { url: 'https://api.deepseek.com/v1/chat/completions',          model: 'deepseek-chat',              vision: false },
+  siliconflow:   { url: 'https://api.siliconflow.cn/v1/chat/completions',       model: 'Qwen/Qwen2.5-VL-7B-Instruct', vision: true },
+  zhipu:         { url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions', model: 'glm-4v-plus',                vision: true },
+  aliyun:        { url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', model: 'qwen-vl-plus', vision: true },
+  baidu:         { url: 'https://qianfan.baidubce.com/v2/chat/completions',      model: 'ernie-4.5-turbo-vision',     vision: true },
+  kimi:          { url: 'https://api.moonshot.cn/v1/chat/completions',           model: 'moonshot-v1-8k-vision-preview', vision: true },
+  lingyi:        { url: 'https://api.lingyiwanwu.com/v1/chat/completions',       model: 'yi-vision',                  vision: true },
+  groq:          { url: 'https://api.groq.com/openai/v1/chat/completions',       model: 'llama-3.2-90b-vision-preview', vision: true },
+  together:      { url: 'https://api.together.xyz/v1/chat/completions',          model: 'meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo', vision: true },
+  openrouter:    { url: 'https://openrouter.ai/api/v1/chat/completions',         model: 'openai/gpt-4o',              vision: true },
+  xai:           { url: 'https://api.x.ai/v1/chat/completions',                  model: 'grok-vision-beta',           vision: true },
+};
+
+function onProviderChange() {
+  const key = document.getElementById('providerSelect').value;
+  if (!key) return;
+  const p = PROVIDERS[key];
+  if (!p) return;
+  document.getElementById('apiUrl').value = p.url;
+  document.getElementById('modelName').value = p.model;
+  document.getElementById('apiStatusDot').className = 'status-dot';
+  document.getElementById('apiStatusText').textContent = '未测试';
+  showToast('已选择: ' + document.getElementById('providerSelect').selectedOptions[0].text.split(' — ')[0], 'success');
+  saveConfig();
+}
+
+// ============ API 地址自动补全 ============
+function normalizeApiUrl(url) {
+  url = url.trim();
+  // 去掉末尾斜杠
+  while (url.endsWith('/')) url = url.slice(0, -1);
+  // 如果末尾是 /v1，补上 /chat/completions
+  if (url.endsWith('/v1')) url += '/chat/completions';
+  // 如果末尾没有 chat/completions，补全整个路径
+  else if (!url.endsWith('/chat/completions') && !url.endsWith('chat/completions')) {
+    // 如果包含 /v1/ 但末尾不是 chat/completions，也补上
+    if (url.includes('/v1')) url += '/chat/completions';
+  }
+  return url;
+}
+
+// ============ API 连接测试 ============
+async function testApiConnection() {
+  let url = document.getElementById('apiUrl').value.trim();
+  url = normalizeApiUrl(url);
+  document.getElementById('apiUrl').value = url;
+  const key = document.getElementById('apiKey').value.trim();
+  const model = document.getElementById('modelName').value.trim();
+  const dot = document.getElementById('apiStatusDot');
+  const text = document.getElementById('apiStatusText');
+
+  if (!url) { dot.className = 'status-dot err'; text.textContent = '请填写 API 地址'; return; }
+  if (!key) { dot.className = 'status-dot err'; text.textContent = '请填写 API Key'; return; }
+
+  dot.className = 'status-dot';
+  text.textContent = '测试中...';
+
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (key) headers['Authorization'] = 'Bearer ' + key;
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        model: model || 'gpt-4o',
+        messages: [{ role: 'user', content: 'Hi' }],
+        max_tokens: 5,
+      }),
+    });
+    if (resp.ok) {
+      dot.className = 'status-dot ok';
+      text.textContent = '✅ 连接成功！';
+      showToast('API 连接成功 ✓', 'success');
+    } else {
+      const err = await resp.text();
+      dot.className = 'status-dot err';
+      text.textContent = '❌ 错误: ' + (err.slice(0, 60) || resp.status);
+      showToast('API 连接失败', 'error');
+    }
+  } catch (e) {
+    dot.className = 'status-dot err';
+    text.textContent = '❌ 无法连接: ' + e.message;
+    showToast('无法连接到 API', 'error');
+  }
+}
+
+// ============ 视频抽帧（浏览器端 Canvas 实现） ============
+function extractVideoFrames(file, frameCount) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.preload = 'auto';
+    video.muted = true;
+    video.playsInline = true;
+    
+    const url = URL.createObjectURL(file);
+    video.src = url;
+    
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      const interval = duration / (frameCount + 1);
+      const frames = [];
+      let loaded = 0;
+      
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      const captureFrame = (time) => {
+        return new Promise((resolveFrame) => {
+          video.currentTime = time;
+          video.onseeked = () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            // 如果图片太大，压缩到最大 1280px
+            let finalCanvas = canvas;
+            if (canvas.width > 1280) {
+              finalCanvas = document.createElement('canvas');
+              const scale = 1280 / canvas.width;
+              finalCanvas.width = 1280;
+              finalCanvas.height = canvas.height * scale;
+              finalCanvas.getContext('2d').drawImage(canvas, 0, 0, finalCanvas.width, finalCanvas.height);
+            }
+            resolveFrame(finalCanvas.toDataURL('image/jpeg', 0.85));
+          };
+        });
+      };
+      
+      const captureAll = async () => {
+        for (let i = 1; i <= frameCount; i++) {
+          try {
+            const b64 = await captureFrame(i * interval);
+            frames.push(b64);
+          } catch(e) {
+            console.warn('Frame capture failed:', e);
+          }
+        }
+        URL.revokeObjectURL(url);
+        resolve(frames);
+      };
+      
+      captureAll();
+    };
+    
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('视频加载失败'));
+    };
+  });
+}
+
+// ============ 提示词模板 ============
+function buildPrompt(lang, isVideo) {
+  const mediaType = isVideo ? '视频' : '图片';
+  const mediaTypeEn = isVideo ? 'video' : 'image';
+  const frameNote = isVideo ? '\n这是从视频中提取的多个关键帧，请综合所有帧的内容推断视频的整体场景、运镜、节奏和叙事。' : '';
+  if (lang === 'en') {
+    return `You are a world-class prompt engineer for AI image generation. Analyze this image in extreme detail and produce a professional prompt.
+
+Follow this exact structure:
+
+## Scene Overview
+One sentence summary of what is shown, the theme, and the overall atmosphere.
+
+## Visual Style
+Photography/painting style, lighting treatment, color grading, texture, rendering technique (e.g. cinematic lighting, cyberpunk neon, soft dreamy, high-contrast black & white, watercolor, 3D photorealistic).
+
+## Color Palette
+Dominant colors, secondary colors, accent colors, color contrast, temperature.
+
+## Lighting & Shadow
+Light source direction, type (side/back/soft/hard/volumetric), light ratio, shadow treatment, highlights.
+
+## Composition & Framing
+Focal length, shot type (close-up/mid/long/wide), composition rules (rule of thirds/leading lines/symmetry/negative space), camera angle (eye-level/overhead/low-angle).
+
+## Subject & Elements
+Main subject: shape, material, texture, pose, expression, clothing, accessories.
+Secondary elements: background, props, environmental details.
+
+## Environment & Atmosphere
+Sense of space, depth of field, weather, season, time of day, air quality (mist/dust/humidity).
+
+## Detail Close-ups
+Skin texture, fur, water droplets, metal reflections, fabric folds, plant veins, and other micro details.
+
+## Mood & Narrative
+Emotion conveyed, story implied, atmosphere keywords.
+
+## Positive Prompt (for AI image generators)
+Compose all elements above into one fluent English prompt paragraph, ready for Stable Diffusion / Midjourney / DALL-E.
+
+## Negative Prompt
+List elements to avoid, comma-separated.`;
+  }
+
+  const cnSection = lang === 'both' ? '' : '请使用中文回答，并在 Positive Prompt 小节输出英文提示词。';
+
+  return `You are a world-class prompt engineer for AI image generation. Analyze this ${mediaTypeEn} in extreme detail and produce a professional prompt. ${cnSection}${frameNote}
+
+Follow this exact structure:
+
+## 📋 场景概览 (Scene Overview)
+一句话总结画面内容、主题、氛围。
+
+## 🎨 视觉风格 (Visual Style)
+摄影/绘画风格、光线处理、色彩调性、影调、质感。
+示例：电影感布光、赛博朋克霓虹、柔焦梦幻、高对比黑白、水彩渲染、3D 写实等。
+
+## 🌈 色彩构成 (Color Palette)
+主色调、辅助色、点缀色、色彩对比关系、色温。
+
+## 💡 光线与阴影 (Lighting & Shadow)
+光源方向、类型（侧光/逆光/柔光/硬光/体积光）、光比、阴影处理。
+
+## 🏗️ 构图与景别 (Composition & Framing)
+镜头焦距、景别（特写/中景/远景/全景）、构图法则（三分法/引导线/对称/留白）、视角（平视/俯视/仰视）。
+
+## 📦 主体与元素 (Subject & Elements)
+主要对象详细描述：形状、材质、纹理、动作、表情、服装、装饰。
+次要元素：背景、道具、环境细节。
+
+## 🌿 环境与氛围 (Environment & Atmosphere)
+空间感、景深、天气、季节、时间、空气质感、湿度感。
+
+## ✨ 细节特写 (Detail Close-ups)
+皮肤质感、绒毛、水珠、金属反光、布料褶皱、植物脉络等微观细节。
+
+## 🎯 情绪与叙事 (Mood & Narrative)
+画面传递的情绪、故事感、氛围情感关键词。
+
+## 📝 正向提示词 (Positive Prompt)
+把以上所有要素组织成一段流畅的英文正向提示词，适合 Stable Diffusion / Midjourney / DALL-E 等 AI 绘图工具直接使用。
+
+## ❌ 负向提示词 (Negative Prompt)
+列出应避免的元素，用英文逗号分隔。`;
+}
+
+// ============ 文件处理 ============
+let currentFile = null;
+
+document.getElementById('uploadZone').addEventListener('dragover', e => {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.add('dragover');
+});
+document.getElementById('uploadZone').addEventListener('dragleave', () => {
+  document.getElementById('uploadZone').classList.remove('dragover');
+});
+document.getElementById('uploadZone').addEventListener('drop', e => {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('dragover');
+  if (e.dataTransfer.files.length > 0) {
+    document.getElementById('fileInput').files = e.dataTransfer.files;
+    handleFile({ target: { files: e.dataTransfer.files } });
+  }
+});
+
+function handleFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const isVideo = file.type.startsWith('video/');
+  
+  if (!isVideo && !file.type.startsWith('image/')) {
+    showToast('请上传图片或视频文件', 'error');
+    return;
+  }
+  if (file.size > 100 * 1024 * 1024) {
+    showToast('文件太大（超过 100MB），请压缩后再试', 'error');
+    return;
+  }
+  currentFile = file;
+  const zone = document.getElementById('uploadZone');
+  zone.classList.add('has-file');
+  document.getElementById('uploadPlaceholder').style.display = 'none';
+  document.getElementById('uploadPreview').style.display = 'block';
+  const wrap = document.getElementById('previewWrap');
+  wrap.innerHTML = '';
+  const info = document.getElementById('fileInfo');
+  const sizeStr = file.size > 1024 * 1024 ? (file.size / 1024 / 1024).toFixed(1) + ' MB' : Math.round(file.size / 1024) + ' KB';
+  info.textContent = file.name + ' (' + sizeStr + ')';
+
+  if (isVideo) {
+    const vid = document.createElement('video');
+    vid.src = URL.createObjectURL(file);
+    vid.controls = true;
+    vid.style.maxHeight = '180px';
+    vid.style.maxWidth = '100%';
+    vid.style.borderRadius = '10px';
+    wrap.appendChild(vid);
+    document.getElementById('frameOptions').style.display = 'block';
+  } else {
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    wrap.appendChild(img);
+    document.getElementById('frameOptions').style.display = 'none';
+  }
+
+  document.getElementById('analyzeBtn').disabled = false;
+}
+
+function resetAll() {
+  currentFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('uploadPlaceholder').style.display = 'block';
+  document.getElementById('uploadPreview').style.display = 'none';
+  document.getElementById('uploadZone').classList.remove('has-file');
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('resultWrap').style.display = 'none';
+  document.getElementById('progressWrap').style.display = 'none';
+}
+
+// ============ 分析 ============
+async function analyze() {
+  if (!currentFile) return;
+
+  let url = document.getElementById('apiUrl').value.trim();
+  url = normalizeApiUrl(url);
+  document.getElementById('apiUrl').value = url;
+  const key = document.getElementById('apiKey').value.trim();
+  const model = document.getElementById('modelName').value.trim();
+  const detail = document.getElementById('detailLevel').value;
+  const lang = document.getElementById('outputLang').value;
+
+  if (!url || !model) {
+    showToast('请先在 ⚙️ API 配置 中填好 API 地址和模型名称', 'error');
+    document.querySelector('#configPanel').open = true;
+    return;
+  }
+
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 分析中...';
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressFill').style.width = '10%';
+  document.getElementById('progressText').textContent = '正在处理图片...';
+  try {
+    document.getElementById('progressFill').style.width = '10%';
+    document.getElementById('progressText').textContent = '正在处理文件...';
+
+    const isVideo = currentFile.type.startsWith('video/');
+
+    // 视频：抽帧后再发送
+    let imageContents = [];
+
+    if (isVideo) {
+      const frameCount = parseInt(document.getElementById('frameCount').value) || 5;
+      document.getElementById('progressFill').style.width = '20%';
+      document.getElementById('progressText').textContent = `正在从视频中提取 ${frameCount} 帧...`;
+      
+      // 用 canvas 从视频中提取帧
+      const frames = await extractVideoFrames(currentFile, frameCount);
+      imageContents = frames.map(f => ({ type: 'image_url', image_url: { url: f, detail: detail } }));
+      
+      document.getElementById('progressFill').style.width = '30%';
+      document.getElementById('progressText').textContent = `已提取 ${frames.length} 帧，正在调用 AI 分析...`;
+    } else {
+      const b64 = await fileToBase64(currentFile);
+      imageContents = [{ type: 'image_url', image_url: { url: b64, detail: detail } }];
+      
+      document.getElementById('progressFill').style.width = '30%';
+      document.getElementById('progressText').textContent = '正在调用 AI 分析...';
+    }
+
+    // 构建提示词
+    const lang = document.getElementById('outputLang').value;
+    const prompt = buildPrompt(lang, isVideo);
+    
+    document.getElementById('progressFill').style.width = '50%';
+    document.getElementById('progressText').textContent = 'AI 正在生成提示词...';
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (key) headers['Authorization'] = 'Bearer ' + key;
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              ...imageContents,
+            ],
+          },
+        ],
+        max_tokens: 4096,
+        stream: false,
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error('API 返回错误 (' + resp.status + '): ' + (errText.slice(0, 200) || resp.statusText));
+    }
+
+    const data = await resp.json();
+    const result = data.choices?.[0]?.message?.content || '';
+
+    if (!result) {
+      throw new Error('API 返回内容为空，请检查模型是否支持图片分析');
+    }
+
+    document.getElementById('progressFill').style.width = '100%';
+    document.getElementById('progressText').textContent = '✅ 完成！';
+
+    displayResult(result);
+  } catch (err) {
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressText').textContent = '❌ ' + err.message;
+    showToast('分析失败: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🔍 开始分析';
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('图片读取失败'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// ============ 展示结果 ============
+function displayResult(text) {
+  const wrap = document.getElementById('resultWrap');
+  wrap.style.display = 'block';
+
+  const content = document.getElementById('resultContent');
+  let html = '';
+  // Split by ## or ### headers
+  const parts = text.split(/(?=#{1,3}\s)/);
+  parts.forEach(s => {
+    const t = s.trim();
+    if (!t) return;
+    const m = t.match(/^(#{1,3})\s+(.+)$/m);
+    if (m) {
+      const title = t.replace(/^#{1,3}\s+.+$/m, '').trim();
+      html += '<div class="section"><div class="section-title">' + m[2].trim() + '</div><div class="section-body">' + escHtml(title) + '</div></div>';
+    } else {
+      html += '<div class="section-body">' + escHtml(t) + '</div>';
+    }
+  });
+  content.innerHTML = html;
+  content.scrollTop = 0;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function copyResult() {
+  const text = document.getElementById('resultContent').textContent;
+  navigator.clipboard.writeText(text).then(() => showToast('✅ 已复制到剪贴板', 'success'));
+}
+
+function downloadResult() {
+  const text = document.getElementById('resultContent').textContent;
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'prompt_' + new Date().toISOString().slice(0,19).replace(/[:]/g, '-') + '.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ============ Toast ============
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  clearTimeout(t._hide);
+  t._hide = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ============ 保存/加载配置（含 API Key） ============
+function saveAllConfig() {
+  const key = document.getElementById('apiKey').value.trim();
+  const data = {
+    apiUrl: document.getElementById('apiUrl').value,
+    model: document.getElementById('modelName').value,
+    key: key,
+    lang: document.getElementById('outputLang').value,
+    detail: document.getElementById('detailLevel').value,
+    provider: document.getElementById('providerSelect').value,
+  };
+  try {
+    localStorage.setItem('prompt_tool_config', JSON.stringify(data));
+    const s = document.getElementById('saveStatus');
+    s.textContent = '✅ 已保存（含 API Key）';
+    setTimeout(() => { s.textContent = ''; }, 3000);
+  } catch(e) {
+    showToast('保存失败: ' + e.message, 'error');
+  }
+}
+
+// Try to load last used config from localStorage
+try {
+  const saved = JSON.parse(localStorage.getItem('prompt_tool_config'));
+  if (saved) {
+    if (saved.apiUrl) document.getElementById('apiUrl').value = saved.apiUrl;
+    if (saved.model) document.getElementById('modelName').value = saved.model;
+    if (saved.key) document.getElementById('apiKey').value = saved.key;
+    if (saved.lang) document.getElementById('outputLang').value = saved.lang;
+    if (saved.detail) document.getElementById('detailLevel').value = saved.detail;
+    if (saved.provider) document.getElementById('providerSelect').value = saved.provider;
+  }
+} catch(e) {}
+
+function saveConfig() {
+  // Auto-save non-sensitive fields on change
+  const data = {
+    apiUrl: document.getElementById('apiUrl').value,
+    model: document.getElementById('modelName').value,
+    lang: document.getElementById('outputLang').value,
+    detail: document.getElementById('detailLevel').value,
+    provider: document.getElementById('providerSelect').value,
+  };
+  try {
+    localStorage.setItem('prompt_tool_config', JSON.stringify(data));
+  } catch(e) {}
+}
+
+// Save config on change
+['apiUrl','modelName','outputLang','detailLevel','providerSelect'].forEach(id => {
+  document.getElementById(id).addEventListener('change', saveConfig);
+});
+</script>
+</body>
+</html>
